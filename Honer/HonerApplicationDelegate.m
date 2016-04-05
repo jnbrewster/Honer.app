@@ -17,20 +17,21 @@
 - (void)applicationDidFinishLaunching:(NSNotification *)notification
 {
     self.preferenceWindow.level = NSPopUpMenuWindowLevel;
-    
+
     NSDictionary *options = @{(__bridge id)kAXTrustedCheckOptionPrompt: @YES};
     BOOL accessibilityEnabled = AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
-    
+
     if(!accessibilityEnabled) {
         // Exit
         return [NSApp performSelector:@selector(terminate:) withObject:nil afterDelay:0.0];
     }
-    
+
     self.statusBar = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
     self.statusBar.image = [[NSImage alloc] initWithContentsOfFile: [[NSBundle mainBundle] pathForResource: @"icon-statusitem" ofType: @"pdf"]];
     self.statusBar.highlightMode = YES;
     self.statusBar.menu = self.statusBarMenu;
-    
+    [self.statusBar.image setTemplate:YES];
+
     NSNotificationCenter *center =  [[NSWorkspace sharedWorkspace] notificationCenter];
     [center addObserver:self selector:@selector(onDeactivate:) name:NSWorkspaceDidDeactivateApplicationNotification object:nil];
 }
@@ -48,13 +49,13 @@
         pid_t pid = [self getFrontPID];
         [self detachNotifications];
         [self getProcessWindow:pid window:&window];
-        
+
         if(window == NULL) {
             [self hideWindow];
         } else {
             [self copyWindow:window];
         }
-        
+
         [self attachNotifications:pid];
     }
     else{
@@ -73,7 +74,7 @@
         suspended = true;
         [self hideWindow];
         [sender setTitle:@"Resume"];
-        
+
     }
 }
 
@@ -92,13 +93,13 @@
     if(axObserver == NULL) {
         return;
     }
-    
+
     AXObserverRemoveNotification(axObserver, axApplication, kAXWindowMiniaturizedNotification);
     AXObserverRemoveNotification(axObserver, axApplication, kAXWindowMovedNotification);
     AXObserverRemoveNotification(axObserver, axApplication, kAXWindowResizedNotification);
     AXObserverRemoveNotification(axObserver, axApplication, kAXFocusedWindowChangedNotification);
     CFRunLoopRemoveSource([[NSRunLoop currentRunLoop] getCFRunLoop], AXObserverGetRunLoopSource(axObserver), kCFRunLoopDefaultMode);
-    
+
     CFRelease(axObserver);
     axObserver = NULL;
     CFRelease(axApplication);
@@ -130,12 +131,12 @@ void updateCallback(AXObserverRef observer, AXUIElementRef element, CFStringRef 
 {
     CGPoint position = [self getWindowPosition:window];
     CGSize size = [self getWindowSize:window];
-    
+
     NSRect frame = [self.window frame];
     frame.origin = [self toOrigin:position size:size];
     frame.size = size;
     [self.window setFrame:frame display:YES animate:NO];
-    
+
     [self.window orderFront:nil];
 }
 
@@ -149,11 +150,11 @@ void updateCallback(AXObserverRef observer, AXUIElementRef element, CFStringRef 
 {
     AXValueRef valueRef;
     CGPoint pos;
-    
+
     AXUIElementCopyAttributeValue(window, kAXPositionAttribute, (const void **)&valueRef);
     AXValueGetValue(valueRef, kAXValueCGPointType, &pos);
     CFRelease(valueRef);
-    
+
     return pos;
 }
 
@@ -161,18 +162,18 @@ void updateCallback(AXObserverRef observer, AXUIElementRef element, CFStringRef 
 {
     AXValueRef valueRef;
     CGSize size;
-    
+
     AXUIElementCopyAttributeValue(window, kAXSizeAttribute, (const void **)&valueRef);
     AXValueGetValue(valueRef, kAXValueCGSizeType, &size);
     CFRelease(valueRef);
-    
+
     return size;
 }
 
 - (void)getProcessWindow:(pid_t)pid window:(AXUIElementRef *)window
 {
     axApplication = AXUIElementCreateApplication(pid);
-    
+
     CFBooleanRef boolRef;
     AXUIElementCopyAttributeValue(axApplication, kAXHiddenAttribute, (const void **)&boolRef);
     if(boolRef == NULL || CFBooleanGetValue(boolRef)) {
